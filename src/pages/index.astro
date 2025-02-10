@@ -36,15 +36,12 @@ function getCountryProjection(country: Feature<Geometry>): ProjectionConfig {
   const dy = bounds[1][1] - bounds[0][1];
   const x = (bounds[0][0] + bounds[1][0]) / 2;
   const y = (bounds[0][1] + bounds[1][1]) / 2;
-  
   let scale = 9 / Math.max(dx / width, dy / height);
-  
-  const MIN_SCALE = 250;  
-  const MAX_SCALE = 850; 
-  
+  const MIN_SCALE = 250;
+  const MAX_SCALE = 850;
   scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
-  
   const center = projection.invert!([x, y]);
+  
   if (!center) {
     return {
       scale: scale,
@@ -64,18 +61,24 @@ const geojson = feature(topology, topology.objects.countries) as any;
 const countries = Array.isArray(geojson.features) ? geojson.features : [geojson] as CountryFeature[];
 const randomCountry = countries[Math.floor(Math.random() * countries.length)];
 const config = getCountryProjection(randomCountry);
+
 const projection = d3.geoMercator()
   .scale(config.scale)
   .center(config.center)
   .translate([480, 300]);
+
 const path = d3.geoPath().projection(projection);
+
 const paths = countries.map((country: CountryFeature): CountryPath => ({
   id: country.id || '',
   d: path(country.geometry) || '',
   name: country.properties.name
 }));
+
 const countryName = randomCountry.properties.name;
+const allCountryNames = paths.map((path : CountryPath) => path.name);
 ---
+
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -85,8 +88,7 @@ const countryName = randomCountry.properties.name;
 <body>
   <div class="container">
     <h1>Guess the Country!</h1>
-    
-    <svg width="960" height="600">
+    <svg width="900" height="600">
       {paths.map((country: CountryPath) => (
         <path
           class={`country ${country.id === randomCountry.id ? 'highlighted' : ''}`}
@@ -94,27 +96,80 @@ const countryName = randomCountry.properties.name;
         />
       ))}
     </svg>
-
-    <form class="guess-form">
-      <input 
-        type="text" 
-        name="guess" 
-        placeholder="Enter the country name"
-        autocomplete="off"
-      />
-      <button type="submit">Guess</button>
-    </form>
+    <div class="guess-container">
+      <form class="guess-form">
+        <div class="input-container">
+          <input
+            type="text"
+            name="guess"
+            placeholder="Enter the country name"
+            autocomplete="off"
+            id="countryInput"
+          />
+          <div id="suggestions" class="suggestions-dropdown hidden"></div>
+        </div>
+        <button type="submit">Guess</button>
+      </form>
+      <div id="error-message" class="error-message hidden">
+        <p>Wrong! The correct answer was: <strong id="correct-country-name"></strong></p>
+      </div>
+    </div>
   </div>
 
-  <script define:vars={{ countryName }}>  
+  <script define:vars={{ countryName, allCountryNames }}>
     const form = document.querySelector('form');
+    const input = document.getElementById('countryInput');
+    const suggestionsDiv = document.getElementById('suggestions');
+    const errorMessageDiv = document.getElementById('error-message');
+    const correctCountryNameSpan = document.getElementById('correct-country-name');
     const correctCountry = countryName;
+
+    function filterCountries(value) {
+      if (!value) return [];
+      const filtered = allCountryNames.filter(country =>
+        country.toLowerCase().includes(value.toLowerCase())
+      );
+      return filtered.slice(0, 5); 
+    }
+
+    function updateSuggestions(suggestions) {
+      suggestionsDiv.innerHTML = '';
+      suggestions.forEach(country => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.textContent = country;
+        div.addEventListener('click', () => {
+          input.value = country;
+          suggestionsDiv.classList.add('hidden');
+        });
+        suggestionsDiv.appendChild(div);
+      });
+      
+      if (suggestions.length > 0) {
+        suggestionsDiv.classList.remove('hidden');
+      } else {
+        suggestionsDiv.classList.add('hidden');
+      }
+    }
+
+    input?.addEventListener('input', (e) => {
+      const value = e.target.value;
+      const filtered = filterCountries(value);
+      updateSuggestions(filtered);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+        suggestionsDiv.classList.add('hidden');
+      }
+    });
 
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
       const guess = new FormData(e.target).get('guess');
+      
       if (guess?.toString().toLowerCase() === correctCountry.toLowerCase()) {
-        // Lanzar confeti al acertar
+        errorMessageDiv.classList.add('hidden');
         confetti({
           particleCount: 100,
           spread: 70,
@@ -122,14 +177,16 @@ const countryName = randomCountry.properties.name;
         });
         setTimeout(() => {
           window.location.reload();
-        }, 1000); 
+        }, 1000);
       } else {
-        // Mostrar borde rojo de error
         document.body.classList.add('error');
+        correctCountryNameSpan.textContent = correctCountry;
+        errorMessageDiv.classList.remove('hidden');
+        input.disabled = true;
         setTimeout(() => {
           document.body.classList.remove('error');
           window.location.reload();
-        }, 1000); 
+        }, 2000);
       }
     });
   </script>

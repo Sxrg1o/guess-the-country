@@ -2,5 +2,3 @@
 
 Todo:
 - Better styling
-- Tab completer
-- Maybe aliases
