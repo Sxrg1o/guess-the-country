@@ -123,6 +123,7 @@ const allCountryNames = paths.map((path : CountryPath) => path.name);
     const errorMessageDiv = document.getElementById('error-message');
     const correctCountryNameSpan = document.getElementById('correct-country-name');
     const correctCountry = countryName;
+    let currentFocus = -1;
 
     function filterCountries(value) {
       if (!value) return [];
@@ -134,22 +135,36 @@ const allCountryNames = paths.map((path : CountryPath) => path.name);
 
     function updateSuggestions(suggestions) {
       suggestionsDiv.innerHTML = '';
-      suggestions.forEach(country => {
+      suggestions.forEach((country, index) => {
         const div = document.createElement('div');
         div.className = 'suggestion-item';
         div.textContent = country;
+        div.setAttribute('data-index', index);
         div.addEventListener('click', () => {
           input.value = country;
           suggestionsDiv.classList.add('hidden');
+          currentFocus = -1;
         });
         suggestionsDiv.appendChild(div);
       });
       
       if (suggestions.length > 0) {
         suggestionsDiv.classList.remove('hidden');
+        currentFocus = -1; 
       } else {
         suggestionsDiv.classList.add('hidden');
       }
+    }
+
+    function addActive() {
+      const items = suggestionsDiv.querySelectorAll('.suggestion-item');
+      if (!items.length) return;
+
+      items.forEach(item => item.classList.remove('active'));
+      
+      if (currentFocus >= items.length) currentFocus = 0;
+      if (currentFocus < 0) currentFocus = items.length - 1;
+      items[currentFocus].classList.add('active');
     }
 
     input?.addEventListener('input', (e) => {
@@ -158,9 +173,39 @@ const allCountryNames = paths.map((path : CountryPath) => path.name);
       updateSuggestions(filtered);
     });
 
+    input?.addEventListener('keydown', (e) => {
+      if (suggestionsDiv.classList.contains('hidden')) return;
+      
+      const items = suggestionsDiv.querySelectorAll('.suggestion-item');
+      
+      if (e.key === 'ArrowDown') {
+        currentFocus++;
+        addActive();
+        e.preventDefault();
+      } 
+      else if (e.key === 'ArrowUp') {
+        currentFocus--;
+        addActive();
+        e.preventDefault();
+      } 
+      else if (e.key === 'Enter' && currentFocus > -1) {
+        if (items[currentFocus]) {
+          e.preventDefault();
+          input.value = items[currentFocus].textContent;
+          suggestionsDiv.classList.add('hidden');
+          currentFocus = -1;
+        }
+      } 
+      else if (e.key === 'Escape') {
+        suggestionsDiv.classList.add('hidden');
+        currentFocus = -1;
+      }
+    });
+
     document.addEventListener('click', (e) => {
       if (!input.contains(e.target) && !suggestionsDiv.contains(e.target)) {
         suggestionsDiv.classList.add('hidden');
+        currentFocus = -1;
       }
     });
 
